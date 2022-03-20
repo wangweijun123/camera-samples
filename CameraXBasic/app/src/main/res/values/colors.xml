@@ -21,4 +21,7 @@
     <color name="icActive">#FFFFFFFF</color>
     <color name="icFocused">#DDFFFFFF</color>
     <color name="icPressed">#AAFFFFFF</color>
+
+    <color name="preview_mock">#9a000000</color> <!-- 9a是透明的哈 -->
+
 </resources>

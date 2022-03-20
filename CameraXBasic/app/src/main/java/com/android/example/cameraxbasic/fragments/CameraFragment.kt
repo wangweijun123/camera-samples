@@ -22,6 +22,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.hardware.display.DisplayManager
@@ -30,6 +32,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.util.Size
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
@@ -53,10 +56,9 @@ import com.android.example.cameraxbasic.MainActivity
 import com.android.example.cameraxbasic.R
 import com.android.example.cameraxbasic.databinding.CameraUiContainerBinding
 import com.android.example.cameraxbasic.databinding.FragmentCameraBinding
-import com.android.example.cameraxbasic.utils.ANIMATION_FAST_MILLIS
-import com.android.example.cameraxbasic.utils.ANIMATION_SLOW_MILLIS
-import com.android.example.cameraxbasic.utils.simulateClick
+import com.android.example.cameraxbasic.utils.*
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.resource.bitmap.TransformationUtils
 import com.bumptech.glide.request.RequestOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -179,7 +181,7 @@ class CameraFragment : Fragment() {
                 // Load thumbnail into circular button using Glide
                 Glide.with(photoViewButton)
                         .load(uri)
-                        .apply(RequestOptions.circleCropTransform())
+//                        .apply(RequestOptions.circleCropTransform())
                         .into(photoViewButton)
             }
         }
@@ -289,6 +291,8 @@ class CameraFragment : Fragment() {
                 .setTargetRotation(rotation)
                 .build()
 
+
+
         // ImageCapture
         imageCapture = ImageCapture.Builder()
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
@@ -314,7 +318,7 @@ class CameraFragment : Fragment() {
                         // Values returned from our analyzer are passed to the attached listener
                         // We log image analysis results here - you should do something useful
                         // instead!
-                        Log.d(TAG, "Average luminosity: $luma")
+//                        Log.d(TAG, "Average luminosity: $luma")
                     })
                 }
 
@@ -452,7 +456,8 @@ class CameraFragment : Fragment() {
         cameraUiContainerBinding?.root?.let {
             fragmentCameraBinding.root.removeView(it)
         }
-
+        // 在这里添加控制的view
+        Log.d(TAG, "updateCameraUi 在这里添加控制的view到rootview")
         cameraUiContainerBinding = CameraUiContainerBinding.inflate(
                 LayoutInflater.from(requireContext()),
                 fragmentCameraBinding.root,
@@ -526,6 +531,7 @@ class CameraFragment : Fragment() {
                         ) { _, uri ->
                             Log.d(TAG, "Image capture scanned into media store: $uri")
                         }
+                        cropImage(savedUri)
                     }
                 })
 
@@ -570,6 +576,97 @@ class CameraFragment : Fragment() {
                         .actionCameraToGallery(outputDirectory.absolutePath))
             }
         }
+    }
+
+    fun cropImage(uri: Uri) {
+        Thread {
+//            Log.d(TAG,"cropImage filePath = $filePath")
+            val bitmap = BitmapFactory.decodeFile(uri.path)
+            val bitmapRotate = TransformationUtils.rotateImage(bitmap, 90)
+            Log.d(TAG,"cropImage 旋转前图片宽高 bitmap.width=${bitmap.width}, bitmap.height=${bitmap.height}")
+            Log.d(TAG,"cropImage 旋转后图片宽高 bitmapRotate.width=${bitmapRotate.width}, bitmapRotate.height=${bitmapRotate.height}")
+            val screenWidth: Int = ScreenUtils.getScreenWidth(activity)
+            val screenHeight: Int = ScreenUtils.getScreenHeight(activity)
+            Log.d(TAG, "屏幕的宽高 screenWidth=$screenWidth, screenHeight:$screenHeight")
+
+            val previewWidth = fragmentCameraBinding.viewFinder.width
+            val previewHeight = fragmentCameraBinding.viewFinder.height
+            Log.d(TAG,"相机预览大小 previewWidth = ${previewWidth},previewHeight=${previewHeight}")
+            val previewLeft = fragmentCameraBinding.viewFinder.left
+            val previewTop = fragmentCameraBinding.viewFinder.top
+            val previewRight = fragmentCameraBinding.viewFinder.right
+            val previewBottom = fragmentCameraBinding.viewFinder.bottom
+            Log.d(TAG,"相机预览位置 previewLeft = ${previewLeft},previewTop=${previewTop}, " +
+                    " previewRight = ${previewRight},previewBottom=${previewBottom}")
+            // view 的位置 比上 预览大小， 按照比例从旋转之后的图片裁剪
+
+            val letfCropIv = fragmentCameraBinding.cropIv.left
+
+            val topCropIv =  fragmentCameraBinding.header.height
+            val rightCropIv = fragmentCameraBinding.cropIv.left + fragmentCameraBinding.cropIv.width
+            val bottomCropIv = fragmentCameraBinding.header.height + fragmentCameraBinding.cropIv.height
+            Log.d(TAG,"高亮图位置 letfCropIv = ${letfCropIv},rightCropIv=${rightCropIv}" +
+                    ", topCropIv=${topCropIv}, bottomCropIv=${bottomCropIv}")
+            /*计算扫描框坐标点占原图坐标点的比例*/
+            val leftProportion = letfCropIv / previewWidth.toFloat()
+            val topProportion = topCropIv / previewHeight.toFloat()
+            val rightProportion = rightCropIv / previewWidth.toFloat()
+            val bottomProportion = bottomCropIv / previewBottom.toFloat()
+
+            val x = (leftProportion * bitmapRotate.width).toInt()
+            val y = (topProportion * bitmapRotate.height).toInt()
+            val scropWidth = ((rightProportion - leftProportion) * bitmapRotate.width).toInt()
+            val scropHeight = ((bottomProportion - topProportion) * bitmapRotate.height).toInt()
+            Log.d(TAG,"x = ${x},y=${y}, scropWidth=${scropWidth}, scropHeight=${scropHeight}")
+            val mCropBitmap = Bitmap.createBitmap(bitmapRotate, x,
+                y, scropWidth, scropHeight)
+
+            // Create output file to hold the image
+            val cropFile = createFile(outputDirectory, FILENAME, PHOTO_EXTENSION)
+            Log.d(TAG,"裁剪图片保存地址= ${cropFile.absolutePath}")
+            val success =
+                ImageUtils.save(mCropBitmap, cropFile.absolutePath, Bitmap.CompressFormat.JPEG)
+            Log.d(TAG,"裁剪图片保存成功 ? ${success}")
+            activity?.runOnUiThread {
+                fragmentCameraBinding.cropIv.setImageBitmap(mCropBitmap)
+
+//                Glide.with(fragmentCameraBinding.cropIv)
+//                    .load(uri)
+//                    .into(fragmentCameraBinding.cropIv)
+            }
+        }.start()
+    }
+
+
+    fun cropImage2(uri: Uri) {
+        Thread {
+//            Log.d(TAG,"cropImage filePath = $filePath")
+            val bitmap = BitmapFactory.decodeFile(uri.path)
+            val bitmapRotate = TransformationUtils.rotateImage(bitmap, 90)
+            Log.d(TAG,"cropImage bitmap.width=${bitmap.width}, bitmap.height=${bitmap.height}")
+            Log.d(TAG,"cropImage bitmapRotate.width=${bitmapRotate.width}, bitmapRotate.height=${bitmapRotate.height}")
+            /*val screenWidth: Int = ScreenUtils.getScreenWidth(activity)
+            val screenHeight: Int = ScreenUtils.getScreenHeight(activity)
+            Log.d(TAG, "屏幕的宽高 screenWidth=$screenWidth, screenHeight:$screenHeight")*/
+            Log.d(TAG,"相机预览大小 width = ${fragmentCameraBinding.viewFinder.width},height=${fragmentCameraBinding.viewFinder.height}")
+            // view 的位置 比上 预览大小， 按照比例从旋转之后的图片裁剪
+
+            val mCropBitmap = Bitmap.createBitmap(bitmapRotate, bitmapRotate.width/4,
+                bitmapRotate.height/4, bitmapRotate.width/2, bitmapRotate.height/2)
+            // Create output file to hold the image
+            val cropFile = createFile(outputDirectory, FILENAME, PHOTO_EXTENSION)
+            Log.d(TAG,"裁剪图片保存地址= ${cropFile.absolutePath}")
+            val success =
+                ImageUtils.save(mCropBitmap, cropFile.absolutePath, Bitmap.CompressFormat.JPEG)
+            Log.d(TAG,"裁剪图片保存成功 ? ${success}")
+            activity?.runOnUiThread {
+                fragmentCameraBinding.cropIv.setImageBitmap(mCropBitmap)
+
+//                Glide.with(fragmentCameraBinding.cropIv)
+//                    .load(uri)
+//                    .into(fragmentCameraBinding.cropIv)
+            }
+        }.start()
     }
 
     /** Enabled or disabled a button to switch cameras depending on the available cameras */
