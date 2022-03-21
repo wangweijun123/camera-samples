@@ -283,10 +283,12 @@ class CameraFragment : Fragment() {
         // CameraSelector
         val cameraSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
 
+        val targetSize = Size(metrics.width(), metrics.height())
         // Preview
         preview = Preview.Builder()
                 // We request aspect ratio but no resolution
-                .setTargetAspectRatio(screenAspectRatio)
+//                .setTargetAspectRatio(screenAspectRatio)
+            .setTargetResolution(targetSize)
                 // Set initial target rotation
                 .setTargetRotation(rotation)
                 .build()
@@ -298,7 +300,8 @@ class CameraFragment : Fragment() {
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                 // We request aspect ratio but no resolution to match preview config, but letting
                 // CameraX optimize for whatever specific resolution best fits our use cases
-                .setTargetAspectRatio(screenAspectRatio)
+//                .setTargetAspectRatio(screenAspectRatio)
+            .setTargetResolution(targetSize)
                 // Set initial target rotation, we will have to call this again if rotation changes
                 // during the lifecycle of this use case
                 .setTargetRotation(rotation)
@@ -579,6 +582,7 @@ class CameraFragment : Fragment() {
     }
 
     fun cropImage(uri: Uri) {
+
         Thread {
 //            Log.d(TAG,"cropImage filePath = $filePath")
             val bitmap = BitmapFactory.decodeFile(uri.path)
@@ -588,6 +592,8 @@ class CameraFragment : Fragment() {
             val screenWidth: Int = ScreenUtils.getScreenWidth(activity)
             val screenHeight: Int = ScreenUtils.getScreenHeight(activity)
             Log.d(TAG, "屏幕的宽高 screenWidth=$screenWidth, screenHeight:$screenHeight")
+            val displayManager = ScreenUtils.getDisplayMetrics(activity)
+            Log.d(TAG, "屏幕的宽高density=${displayManager.density}, densityDpi=${displayManager.densityDpi}")
 
             val previewWidth = fragmentCameraBinding.viewFinder.width
             val previewHeight = fragmentCameraBinding.viewFinder.height
@@ -611,8 +617,8 @@ class CameraFragment : Fragment() {
             val leftProportion = letfCropIv / previewWidth.toFloat()
             val topProportion = topCropIv / previewHeight.toFloat()
             val rightProportion = rightCropIv / previewWidth.toFloat()
-            val bottomProportion = bottomCropIv / previewBottom.toFloat()
-
+            val bottomProportion = bottomCropIv / previewHeight.toFloat()
+            Log.d(TAG,"leftProportion = ${leftProportion},rightProportion=${rightProportion}")
             val x = (leftProportion * bitmapRotate.width).toInt()
             val y = (topProportion * bitmapRotate.height).toInt()
             val scropWidth = ((rightProportion - leftProportion) * bitmapRotate.width).toInt()
@@ -653,6 +659,38 @@ class CameraFragment : Fragment() {
 
             val mCropBitmap = Bitmap.createBitmap(bitmapRotate, bitmapRotate.width/4,
                 bitmapRotate.height/4, bitmapRotate.width/2, bitmapRotate.height/2)
+            // Create output file to hold the image
+            val cropFile = createFile(outputDirectory, FILENAME, PHOTO_EXTENSION)
+            Log.d(TAG,"裁剪图片保存地址= ${cropFile.absolutePath}")
+            val success =
+                ImageUtils.save(mCropBitmap, cropFile.absolutePath, Bitmap.CompressFormat.JPEG)
+            Log.d(TAG,"裁剪图片保存成功 ? ${success}")
+            activity?.runOnUiThread {
+                fragmentCameraBinding.cropIv.setImageBitmap(mCropBitmap)
+
+//                Glide.with(fragmentCameraBinding.cropIv)
+//                    .load(uri)
+//                    .into(fragmentCameraBinding.cropIv)
+            }
+        }.start()
+    }
+
+    fun cropImage3(uri: Uri) {
+        Thread {
+//            Log.d(TAG,"cropImage filePath = $filePath")
+            val bitmap = BitmapFactory.decodeFile(uri.path)
+            val bitmapRotate = TransformationUtils.rotateImage(bitmap, 90)
+            Log.d(TAG,"cropImage bitmap.width=${bitmap.width}, bitmap.height=${bitmap.height}")
+            Log.d(TAG,"cropImage bitmapRotate.width=${bitmapRotate.width}, bitmapRotate.height=${bitmapRotate.height}")
+            /*val screenWidth: Int = ScreenUtils.getScreenWidth(activity)
+            val screenHeight: Int = ScreenUtils.getScreenHeight(activity)
+            Log.d(TAG, "屏幕的宽高 screenWidth=$screenWidth, screenHeight:$screenHeight")*/
+            Log.d(TAG,"相机预览大小 width = ${fragmentCameraBinding.viewFinder.width},height=${fragmentCameraBinding.viewFinder.height}")
+            // view 的位置 比上 预览大小， 按照比例从旋转之后的图片裁剪
+            val cropWidth = (bitmapRotate.width/2.0).toInt()
+            val cropHeight = (bitmapRotate.height/2.0).toInt()
+            Log.d(TAG,"从起始位置开始裁剪图片cropWidth= $cropWidth, cropHeight=$cropHeight")
+            val mCropBitmap = Bitmap.createBitmap(bitmapRotate, 0,0,cropWidth , cropHeight)
             // Create output file to hold the image
             val cropFile = createFile(outputDirectory, FILENAME, PHOTO_EXTENSION)
             Log.d(TAG,"裁剪图片保存地址= ${cropFile.absolutePath}")

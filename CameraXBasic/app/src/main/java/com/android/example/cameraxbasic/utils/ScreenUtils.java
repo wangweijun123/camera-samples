@@ -1,6 +1,7 @@
 package com.android.example.cameraxbasic.utils;
 
 import android.content.Context;
+import android.util.DisplayMetrics;
 
 /**
  * Author       wildma
@@ -29,5 +30,9 @@ public class ScreenUtils {
      */
     public static int getScreenHeight(Context context) {
         return context.getResources().getDisplayMetrics().heightPixels;
+    }
+
+    public static DisplayMetrics getDisplayMetrics(Context context) {
+        return context.getResources().getDisplayMetrics();
     }
 }
