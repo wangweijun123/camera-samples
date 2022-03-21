@@ -31,10 +31,6 @@ import java.io.File
 
 private const val IMMERSIVE_FLAG_TIMEOUT = 500L
 
-/**
- * Main entry point into our app. This app follows the single-activity pattern, and all
- * functionality is implemented in the form of fragments.
- */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var activityMainBinding: ActivityMainBinding
@@ -47,28 +43,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Before setting full screen flags, we must wait a bit to let UI settle; otherwise, we may
-        // be trying to set app to immersive mode before it's ready and the flags do not stick
         activityMainBinding.fragmentContainer.postDelayed({
             hideSystemUI()
         }, IMMERSIVE_FLAG_TIMEOUT)
     }
 
-
-
-    override fun onBackPressed() {
-        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
-            // Workaround for Android Q memory leak issue in IRequestFinishCallback$Stub.
-            // (https://issuetracker.google.com/issues/139738913)
-            finishAfterTransition()
-        } else {
-            super.onBackPressed()
-        }
-    }
-
     companion object {
-
-        /** Use external media if it is available, our app's file directory otherwise */
         fun getOutputDirectory(context: Context): File {
             val appContext = context.applicationContext
             val mediaDir = context.externalMediaDirs.firstOrNull()?.let {

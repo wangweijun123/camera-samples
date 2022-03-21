@@ -63,27 +63,8 @@ class CameraFragment : Fragment() {
     private var cameraProvider: ProcessCameraProvider? = null
     private lateinit var windowManager: WindowManager
 
-    /** Blocking camera operations are performed using this executor */
     private lateinit var cameraExecutor: ExecutorService
 
-    override fun onResume() {
-        super.onResume()
-        if (!PermissionsFragment.hasPermissions(requireContext())) {
-            Navigation.findNavController(requireActivity(), R.id.fragment_container).navigate(
-                    CameraFragmentDirections.actionCameraToPermissions()
-            )
-        }
-    }
-
-    override fun onDestroyView() {
-        _fragmentCameraBinding = null
-        super.onDestroyView()
-
-        // Shut down our background executor
-        cameraExecutor.shutdown()
-
-
-    }
 
     override fun onCreateView(
             inflater: LayoutInflater,
@@ -94,20 +75,21 @@ class CameraFragment : Fragment() {
         return fragmentCameraBinding.root
     }
 
-    private fun setGalleryThumbnail(uri: Uri) {
-        // Run the operations in the view's thread
-        cameraUiContainerBinding?.photoViewButton?.let { photoViewButton ->
-            photoViewButton.post {
-                // Remove thumbnail padding
-                photoViewButton.setPadding(resources.getDimension(R.dimen.stroke_small).toInt())
 
-                // Load thumbnail into circular button using Glide
-                Glide.with(photoViewButton)
-                        .load(uri)
-//                        .apply(RequestOptions.circleCropTransform())
-                        .into(photoViewButton)
-            }
+    override fun onResume() {
+        super.onResume()
+        if (!PermissionsFragment.hasPermissions(requireContext())) {
+            Navigation.findNavController(requireActivity(), R.id.fragment_container).navigate(
+                R.id.action_camera_to_permissions
+            )
         }
+    }
+
+    override fun onDestroyView() {
+        _fragmentCameraBinding = null
+        super.onDestroyView()
+        // Shut down our background executor
+        cameraExecutor.shutdown()
     }
 
     @SuppressLint("MissingPermission")
@@ -222,8 +204,6 @@ class CameraFragment : Fragment() {
         cameraUiContainerBinding?.root?.let {
             fragmentCameraBinding.root.removeView(it)
         }
-        // 在这里添加控制的view
-        Log.d(TAG, "updateCameraUi 在这里添加控制的view到rootview")
         cameraUiContainerBinding = CameraUiContainerBinding.inflate(
                 LayoutInflater.from(requireContext()),
                 fragmentCameraBinding.root,
@@ -233,18 +213,12 @@ class CameraFragment : Fragment() {
             imageCapture?.let { imageCapture ->
                 // Create output file to hold the image
                 val photoFile = createFile(outputDirectory, FILENAME, PHOTO_EXTENSION)
-
-                // Setup image capture metadata
                 val metadata = Metadata().apply {
                     isReversedHorizontal = false
                 }
-
-                // Create output options object which contains file + metadata
                 val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile)
                         .setMetadata(metadata)
                         .build()
-
-                // Setup image capture listener which is triggered after photo has been taken
                 imageCapture.takePicture(
                         outputOptions, cameraExecutor, object : ImageCapture.OnImageSavedCallback {
                     override fun onError(exc: ImageCaptureException) {
@@ -254,26 +228,6 @@ class CameraFragment : Fragment() {
                     override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                         val savedUri = output.savedUri ?: Uri.fromFile(photoFile)
                         Log.d(TAG, "Photo capture succeeded: $savedUri")
-
-                        // Implicit broadcasts will be ignored for devices running API level >= 24
-                        // so if you only target API level 24+ you can remove this statement
-                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-                            requireActivity().sendBroadcast(
-                                    Intent(android.hardware.Camera.ACTION_NEW_PICTURE, savedUri)
-                            )
-                        }
-                        // If the folder selected is an external media directory, this is
-                        // unnecessary but otherwise other apps will not be able to access our
-                        // images unless we scan them using [MediaScannerConnection]
-                        val mimeType = MimeTypeMap.getSingleton()
-                                .getMimeTypeFromExtension(savedUri.toFile().extension)
-                        MediaScannerConnection.scanFile(
-                                context,
-                                arrayOf(savedUri.toFile().absolutePath),
-                                arrayOf(mimeType)
-                        ) { _, uri ->
-                            Log.d(TAG, "Image capture scanned into media store: $uri")
-                        }
                         cropImage(savedUri)
                     }
                 })
@@ -289,7 +243,6 @@ class CameraFragment : Fragment() {
             }
         }
 
-        // Listener for button used to view the most recent photo
         cameraUiContainerBinding?.photoViewButton?.setOnClickListener {
             Log.d(TAG,"click photoViewButton")
         }

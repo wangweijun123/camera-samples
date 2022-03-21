@@ -30,10 +30,6 @@ import com.android.example.cameraxbasic.R
 private const val PERMISSIONS_REQUEST_CODE = 10
 private val PERMISSIONS_REQUIRED = arrayOf(Manifest.permission.CAMERA)
 
-/**
- * The sole purpose of this fragment is to request permissions and, once granted, display the
- * camera fragment to the user.
- */
 class PermissionsFragment : Fragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,11 +47,10 @@ class PermissionsFragment : Fragment() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PERMISSIONS_REQUEST_CODE) {
             if (PackageManager.PERMISSION_GRANTED == grantResults.firstOrNull()) {
-                // Take the user to the success fragment when permission is granted
-                Toast.makeText(context, "Permission request granted", Toast.LENGTH_LONG).show()
                 navigateToCamera()
             } else {
                 Toast.makeText(context, "Permission request denied", Toast.LENGTH_LONG).show()
+                requireActivity().finish()
             }
         }
     }
@@ -63,7 +58,7 @@ class PermissionsFragment : Fragment() {
     private fun navigateToCamera() {
         lifecycleScope.launchWhenStarted {
             Navigation.findNavController(requireActivity(), R.id.fragment_container).navigate(
-                    PermissionsFragmentDirections.actionPermissionsToCamera())
+                    R.id.action_permissions_to_camera)
         }
     }
 
