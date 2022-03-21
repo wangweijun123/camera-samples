@@ -40,10 +40,8 @@ class PermissionsFragment : Fragment() {
         super.onCreate(savedInstanceState)
 
         if (!hasPermissions(requireContext())) {
-            // Request camera-related permissions
             requestPermissions(PERMISSIONS_REQUIRED, PERMISSIONS_REQUEST_CODE)
         } else {
-            // If permissions have already been granted, proceed
             navigateToCamera()
         }
     }
@@ -70,8 +68,6 @@ class PermissionsFragment : Fragment() {
     }
 
     companion object {
-
-        /** Convenience method used to check if all permissions required by this app are granted */
         fun hasPermissions(context: Context) = PERMISSIONS_REQUIRED.all {
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         }
