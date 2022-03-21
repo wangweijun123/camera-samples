@@ -43,6 +43,10 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
+/** Milliseconds used for UI animations */
+const val ANIMATION_FAST_MILLIS = 50L
+const val ANIMATION_SLOW_MILLIS = 100L
+
 class CameraFragment : Fragment() {
 
     private var _fragmentCameraBinding: FragmentCameraBinding? = null
@@ -95,49 +99,26 @@ class CameraFragment : Fragment() {
     @SuppressLint("MissingPermission")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
-        // Initialize our background executor
-        cameraExecutor = Executors.newSingleThreadExecutor()
-
+        cameraExecutor = Executors.newFixedThreadPool(2)
         broadcastManager = LocalBroadcastManager.getInstance(view.context)
-
-        //Initialize WindowManager to retrieve display metrics
         windowManager = WindowManager(view.context)
-
-        // Determine the output directory
         outputDirectory = MainActivity.getOutputDirectory(requireContext())
-
-        // Wait for the views to be properly laid out
         fragmentCameraBinding.viewFinder.post {
-
-            // Keep track of the display in which this view is attached
             displayId = fragmentCameraBinding.viewFinder.display.displayId
-
-            // Build UI controls
             updateCameraUi()
-
-            // Set up the camera and its use cases
             setUpCamera()
         }
     }
 
-
-    /** Initialize CameraX, and prepare to bind the camera use cases  */
     private fun setUpCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
         cameraProviderFuture.addListener(Runnable {
-
-            // CameraProvider
             cameraProvider = cameraProviderFuture.get()
-
-            // Build and bind the camera use cases
             bindCameraUseCases()
         }, ContextCompat.getMainExecutor(requireContext()))
     }
 
-    /** Declare and bind preview, capture and analysis use cases */
     private fun bindCameraUseCases() {
-        // Get screen metrics used to setup camera for full screen resolution
         val metrics = windowManager.getCurrentWindowMetrics().bounds
         Log.d(TAG, "Screen metrics: ${metrics.width()} x ${metrics.height()}")
 
@@ -150,42 +131,26 @@ class CameraFragment : Fragment() {
         val cameraProvider = cameraProvider
                 ?: throw IllegalStateException("Camera initialization failed.")
 
-        // CameraSelector
         val cameraSelector = CameraSelector.Builder().requireLensFacing(CameraSelector.LENS_FACING_BACK).build()
 
         val targetSize = Size(metrics.width(), metrics.height())
-        // Preview
         preview = Preview.Builder()
-                // We request aspect ratio but no resolution
-//                .setTargetAspectRatio(screenAspectRatio)
             .setTargetResolution(targetSize)
-                // Set initial target rotation
                 .setTargetRotation(rotation)
                 .build()
 
         // ImageCapture
         imageCapture = ImageCapture.Builder()
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                // We request aspect ratio but no resolution to match preview config, but letting
-                // CameraX optimize for whatever specific resolution best fits our use cases
-//                .setTargetAspectRatio(screenAspectRatio)
-            .setTargetResolution(targetSize)
-                // Set initial target rotation, we will have to call this again if rotation changes
-                // during the lifecycle of this use case
+                .setTargetResolution(targetSize)
                 .setTargetRotation(rotation)
                 .build()
-
-
         // Must unbind the use-cases before rebinding them
         cameraProvider.unbindAll()
 
         try {
-            // A variable number of use-cases can be passed here -
-            // camera provides access to CameraControl & CameraInfo
             camera = cameraProvider.bindToLifecycle(
                     this, cameraSelector, preview, imageCapture)
-
-            // Attach the viewfinder's surface provider to preview use case
             preview?.setSurfaceProvider(fragmentCameraBinding.viewFinder.surfaceProvider)
         } catch (exc: Exception) {
             Log.e(TAG, "Use case binding failed", exc)
@@ -249,8 +214,7 @@ class CameraFragment : Fragment() {
     }
 
     fun cropImage(uri: Uri) {
-        Thread {
-//            Log.d(TAG,"cropImage filePath = $filePath")
+        cameraExecutor.execute {
             val bitmap = BitmapFactory.decodeFile(uri.path)
             val bitmapRotate = TransformationUtils.rotateImage(bitmap, 90)
             Log.d(TAG,"cropImage 旋转前图片宽高 bitmap.width=${bitmap.width}, bitmap.height=${bitmap.height}")
@@ -270,8 +234,6 @@ class CameraFragment : Fragment() {
             val previewBottom = fragmentCameraBinding.viewFinder.bottom
             Log.d(TAG,"相机预览位置 previewLeft = ${previewLeft},previewTop=${previewTop}, " +
                     " previewRight = ${previewRight},previewBottom=${previewBottom}")
-            // view 的位置 比上 预览大小， 按照比例从旋转之后的图片裁剪
-
             val letfCropIv = fragmentCameraBinding.cropIv.left
 
             val topCropIv =  fragmentCameraBinding.header.height
@@ -301,14 +263,9 @@ class CameraFragment : Fragment() {
             Log.d(TAG,"裁剪图片保存成功 ? ${success}")
             activity?.runOnUiThread {
                 fragmentCameraBinding.cropIv.setImageBitmap(mCropBitmap)
-
-//                Glide.with(fragmentCameraBinding.cropIv)
-//                    .load(uri)
-//                    .into(fragmentCameraBinding.cropIv)
             }
-        }.start()
+        }
     }
-
 
     companion object {
         private const val TAG = "CameraXBasic"
