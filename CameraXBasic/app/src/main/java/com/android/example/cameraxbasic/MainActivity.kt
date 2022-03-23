@@ -16,20 +16,16 @@
 
 package com.android.example.cameraxbasic
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
-import android.view.KeyEvent
+import android.util.Log
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.android.example.cameraxbasic.databinding.ActivityMainBinding
-import java.io.File
+import com.android.example.cameraxbasic.fragments.CameraFragment
 
-private const val IMMERSIVE_FLAG_TIMEOUT = 500L
 
 class MainActivity : AppCompatActivity() {
 
@@ -41,28 +37,23 @@ class MainActivity : AppCompatActivity() {
         setContentView(activityMainBinding.root)
     }
 
-    override fun onResume() {
-        super.onResume()
-        activityMainBinding.fragmentContainer.postDelayed({
-            hideSystemUI()
-        }, IMMERSIVE_FLAG_TIMEOUT)
+    fun jumpCameraActivity(view: View) {
+        val intent = Intent(applicationContext, CameraActivity::class.java)
+        intent.putExtra("camera_title", "this is title")
+        intent.putExtra("camera_desc", "this is desc")
+        startActivityForResult(intent, 1)
+
     }
 
-    companion object {
-        fun getOutputDirectory(context: Context): File {
-            val appContext = context.applicationContext
-            val mediaDir = context.externalMediaDirs.firstOrNull()?.let {
-                File(it, appContext.resources.getString(R.string.app_name)).apply { mkdirs() } }
-            return if (mediaDir != null && mediaDir.exists())
-                mediaDir else appContext.filesDir
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 1 && resultCode == Activity.RESULT_OK) {
+            data?.let {
+                val filePath = it.getStringExtra("file_path")
+                Log.d(CameraFragment.TAG, "filepath = $filePath")
+            }
         }
+
     }
 
-    private fun hideSystemUI() {
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        WindowInsetsControllerCompat(window, activityMainBinding.fragmentContainer).let { controller ->
-            controller.hide(WindowInsetsCompat.Type.systemBars())
-            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
-    }
 }

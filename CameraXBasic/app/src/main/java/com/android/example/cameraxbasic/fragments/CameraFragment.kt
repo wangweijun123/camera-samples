@@ -1,12 +1,12 @@
 package com.android.example.cameraxbasic.fragments
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
-import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -15,24 +15,20 @@ import android.util.Size
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.webkit.MimeTypeMap
-import android.widget.Toast
 import androidx.camera.core.*
 import androidx.camera.core.ImageCapture.Metadata
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
-import androidx.core.net.toFile
-import androidx.core.view.setPadding
 import androidx.fragment.app.Fragment
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.navigation.Navigation
 import androidx.window.WindowManager
+import com.android.example.cameraxbasic.CameraActivity
 import com.android.example.cameraxbasic.MainActivity
 import com.android.example.cameraxbasic.R
 import com.android.example.cameraxbasic.databinding.CameraUiContainerBinding
 import com.android.example.cameraxbasic.databinding.FragmentCameraBinding
 import com.android.example.cameraxbasic.utils.*
-import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.bitmap.TransformationUtils
 import java.io.File
 import java.text.SimpleDateFormat
@@ -56,7 +52,6 @@ class CameraFragment : Fragment() {
     private var cameraUiContainerBinding: CameraUiContainerBinding? = null
 
     private lateinit var outputDirectory: File
-    private lateinit var broadcastManager: LocalBroadcastManager
 
     private var displayId: Int = -1
 
@@ -96,18 +91,21 @@ class CameraFragment : Fragment() {
         cameraExecutor.shutdown()
     }
 
-    @SuppressLint("MissingPermission")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         cameraExecutor = Executors.newFixedThreadPool(2)
-        broadcastManager = LocalBroadcastManager.getInstance(view.context)
         windowManager = WindowManager(view.context)
-        outputDirectory = MainActivity.getOutputDirectory(requireContext())
+        outputDirectory = CameraActivity.getOutputDirectory(requireContext())
         fragmentCameraBinding.viewFinder.post {
             displayId = fragmentCameraBinding.viewFinder.display.displayId
             updateCameraUi()
             setUpCamera()
         }
+        fragmentCameraBinding.arrowLeft.text = "<<<<<<<<<<<<<<\n<<<<<<<<<<<<<<<<"
+        val cameraActivity = activity as CameraActivity
+        fragmentCameraBinding.cameraTitle.text = cameraActivity.cameraTitle
+        fragmentCameraBinding.cameraDesc.text = cameraActivity.cameraDesc
+
     }
 
     private fun setUpCamera() {
@@ -120,17 +118,10 @@ class CameraFragment : Fragment() {
 
     private fun bindCameraUseCases() {
         val metrics = windowManager.getCurrentWindowMetrics().bounds
-        Log.d(TAG, "Screen metrics: ${metrics.width()} x ${metrics.height()}")
-
-        val screenAspectRatio = aspectRatio(metrics.width(), metrics.height())
-        Log.d(TAG, "Preview aspect ratio: $screenAspectRatio")
-
         val rotation = fragmentCameraBinding.viewFinder.display.rotation
-
         // CameraProvider
         val cameraProvider = cameraProvider
                 ?: throw IllegalStateException("Camera initialization failed.")
-
         val cameraSelector = CameraSelector.Builder().requireLensFacing(CameraSelector.LENS_FACING_BACK).build()
 
         val targetSize = Size(metrics.width(), metrics.height())
@@ -155,14 +146,6 @@ class CameraFragment : Fragment() {
         } catch (exc: Exception) {
             Log.e(TAG, "Use case binding failed", exc)
         }
-    }
-
-    private fun aspectRatio(width: Int, height: Int): Int {
-        val previewRatio = max(width, height).toDouble() / min(width, height)
-        if (abs(previewRatio - RATIO_4_3_VALUE) <= abs(previewRatio - RATIO_16_9_VALUE)) {
-            return AspectRatio.RATIO_4_3
-        }
-        return AspectRatio.RATIO_16_9
     }
 
     private fun updateCameraUi() {
@@ -217,43 +200,27 @@ class CameraFragment : Fragment() {
         cameraExecutor.execute {
             val bitmap = BitmapFactory.decodeFile(uri.path)
             val bitmapRotate = TransformationUtils.rotateImage(bitmap, 90)
-            Log.d(TAG,"cropImage 旋转前图片宽高 bitmap.width=${bitmap.width}, bitmap.height=${bitmap.height}")
-            Log.d(TAG,"cropImage 旋转后图片宽高 bitmapRotate.width=${bitmapRotate.width}, bitmapRotate.height=${bitmapRotate.height}")
-            val screenWidth: Int = ScreenUtils.getScreenWidth(activity)
-            val screenHeight: Int = ScreenUtils.getScreenHeight(activity)
-            Log.d(TAG, "屏幕的宽高 screenWidth=$screenWidth, screenHeight:$screenHeight")
-            val displayManager = ScreenUtils.getDisplayMetrics(activity)
-            Log.d(TAG, "屏幕的宽高density=${displayManager.density}, densityDpi=${displayManager.densityDpi}")
-
             val previewWidth = fragmentCameraBinding.viewFinder.width
             val previewHeight = fragmentCameraBinding.viewFinder.height
-            Log.d(TAG,"相机预览大小 previewWidth = ${previewWidth},previewHeight=${previewHeight}")
-            val previewLeft = fragmentCameraBinding.viewFinder.left
-            val previewTop = fragmentCameraBinding.viewFinder.top
-            val previewRight = fragmentCameraBinding.viewFinder.right
-            val previewBottom = fragmentCameraBinding.viewFinder.bottom
-            Log.d(TAG,"相机预览位置 previewLeft = ${previewLeft},previewTop=${previewTop}, " +
-                    " previewRight = ${previewRight},previewBottom=${previewBottom}")
-            val letfCropIv = fragmentCameraBinding.cropIv.left
 
+            /* 扫描框区域位置 */
+            val letfCropIv = fragmentCameraBinding.cropContainer.left
             val topCropIv =  fragmentCameraBinding.header.height
-            val rightCropIv = fragmentCameraBinding.cropIv.left + fragmentCameraBinding.cropIv.width
-            val bottomCropIv = fragmentCameraBinding.header.height + fragmentCameraBinding.cropIv.height
-            Log.d(TAG,"高亮图位置 letfCropIv = ${letfCropIv},rightCropIv=${rightCropIv}" +
-                    ", topCropIv=${topCropIv}, bottomCropIv=${bottomCropIv}")
-            /*计算扫描框坐标点占原图坐标点的比例*/
+            val rightCropIv = fragmentCameraBinding.cropContainer.left + fragmentCameraBinding.cropContainer.width
+            val bottomCropIv = fragmentCameraBinding.header.height + fragmentCameraBinding.cropContainer.height
+
+            /* 计算扫描框坐标点占原图坐标点的比例 */
             val leftProportion = letfCropIv / previewWidth.toFloat()
             val topProportion = topCropIv / previewHeight.toFloat()
             val rightProportion = rightCropIv / previewWidth.toFloat()
             val bottomProportion = bottomCropIv / previewHeight.toFloat()
-            Log.d(TAG,"leftProportion = ${leftProportion},rightProportion=${rightProportion}")
+
             val x = (leftProportion * bitmapRotate.width).toInt()
             val y = (topProportion * bitmapRotate.height).toInt()
-            val scropWidth = ((rightProportion - leftProportion) * bitmapRotate.width).toInt()
-            val scropHeight = ((bottomProportion - topProportion) * bitmapRotate.height).toInt()
-            Log.d(TAG,"x = ${x},y=${y}, scropWidth=${scropWidth}, scropHeight=${scropHeight}")
-            val mCropBitmap = Bitmap.createBitmap(bitmapRotate, x,
-                y, scropWidth, scropHeight)
+            val cropWidth = ((rightProportion - leftProportion) * bitmapRotate.width).toInt()
+            val cropHeight = ((bottomProportion - topProportion) * bitmapRotate.height).toInt()
+
+            val mCropBitmap = Bitmap.createBitmap(bitmapRotate, x, y, cropWidth, cropHeight)
 
             // Create output file to hold the image
             val cropFile = createFile(outputDirectory, FILENAME, PHOTO_EXTENSION)
@@ -263,16 +230,18 @@ class CameraFragment : Fragment() {
             Log.d(TAG,"裁剪图片保存成功 ? ${success}")
             activity?.runOnUiThread {
                 fragmentCameraBinding.cropIv.setImageBitmap(mCropBitmap)
+                val intent = Intent()
+                intent.putExtra("file_path", cropFile.absolutePath)
+                requireActivity().setResult(Activity.RESULT_OK, intent)
+                requireActivity().finish()
             }
         }
     }
 
     companion object {
-        private const val TAG = "CameraXBasic"
+        const val TAG = "CameraXBasic"
         private const val FILENAME = "yyyy-MM-dd-HH-mm-ss-SSS"
         private const val PHOTO_EXTENSION = ".jpg"
-        private const val RATIO_4_3_VALUE = 4.0 / 3.0
-        private const val RATIO_16_9_VALUE = 16.0 / 9.0
 
         /** Helper function used to create a timestamped file */
         private fun createFile(baseFolder: File, format: String, extension: String) =

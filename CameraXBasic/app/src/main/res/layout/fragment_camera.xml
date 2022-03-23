@@ -39,20 +39,31 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="240dp">
-
             <View
                 android:layout_width="16dp"
                 android:layout_height="match_parent"
-
                 android:background="@color/preview_mock" />
             <!--相机裁剪区域-->
-            <ImageView
-                android:id="@+id/cropIv"
+            <FrameLayout
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="match_parent"
-                android:scaleType="fitXY"
-                android:src="@mipmap/camera_idcard_front" />
+                android:id="@+id/cropContainer">
+                <ImageView
+                    android:id="@+id/cropIv"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@mipmap/camera_idcard_front" />
+                <TextView
+                    android:id="@+id/arrow_left"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#FCD535"
+                    android:layout_marginBottom="20dp"
+                    android:layout_gravity="bottom|center_horizontal"/>
+            </FrameLayout>
+
 
             <View
                 android:layout_width="16dp"
@@ -74,7 +85,8 @@
                 android:text="Back side of ID Card"
                 android:textColor="#EAECEF"
                 android:textSize="20sp"
-                android:layout_marginTop="32dp"/>
+                android:layout_marginTop="32dp"
+                android:id="@+id/camera_title"/>
 
             <TextView
                 android:layout_width="wrap_content"
@@ -82,7 +94,8 @@
                 android:text="Place the Back of the ID card in the frame"
                 android:textColor="#FFFFFF"
                 android:textSize="16sp"
-                android:layout_marginTop="8dp"/>
+                android:layout_marginTop="8dp"
+                android:id="@+id/camera_desc"/>
         </LinearLayout>
     </LinearLayout>
 
