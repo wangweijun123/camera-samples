@@ -101,7 +101,7 @@ class CameraFragment : Fragment() {
             updateCameraUi()
             setUpCamera()
         }
-        fragmentCameraBinding.arrowLeft.text = "<<<<<<<<<<<<<<\n<<<<<<<<<<<<<<<<"
+//        fragmentCameraBinding.arrowLeft.text = "<<<<<<<<<<<<<<\n<<<<<<<<<<<<<<<<"
         val cameraActivity = activity as CameraActivity
         fragmentCameraBinding.cameraTitle.text = cameraActivity.cameraTitle
         fragmentCameraBinding.cameraDesc.text = cameraActivity.cameraDesc
@@ -230,10 +230,10 @@ class CameraFragment : Fragment() {
             Log.d(TAG,"裁剪图片保存成功 ? ${success}")
             activity?.runOnUiThread {
                 fragmentCameraBinding.cropIv.setImageBitmap(mCropBitmap)
-                val intent = Intent()
-                intent.putExtra("file_path", cropFile.absolutePath)
-                requireActivity().setResult(Activity.RESULT_OK, intent)
-                requireActivity().finish()
+//                val intent = Intent()
+//                intent.putExtra("file_path", cropFile.absolutePath)
+//                requireActivity().setResult(Activity.RESULT_OK, intent)
+//                requireActivity().finish()
             }
         }
     }
